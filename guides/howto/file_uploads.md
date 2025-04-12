@@ -24,13 +24,13 @@ In the [`Contexts guide`](contexts.md), we generated an HTML resource for produc
 
 ### Configure a multipart form
 
-The first thing you need to do is change your form into a multipart form. The `HelloWeb.CoreComponents` `simple_form/1` component accepts a `multipart` attribute where you can specify this.
+The first thing you need to do is change your form into a multipart form. The `HelloWeb.CoreComponents` `form/1` component accepts a `multipart` attribute where you can specify this.
 
 Here is the form from `lib/hello_web/controllers/product_html/product_form.html.heex` with that change in place:
 
 ```heex
-<.simple_form :let={f} for={@changeset} action={@action} multipart>
-. . .
+<.form :let={f} for={@changeset} action={@action} multipart>
+...
 ```
 
 ### Add a file input
@@ -38,13 +38,11 @@ Here is the form from `lib/hello_web/controllers/product_html/product_form.html.
 Once you have a multipart form, you need a `file` input. Here's how you would do that, also in `product_form.html.heex`:
 
 ```heex
-. . .
+...
   <.input field={f[:photo]} type="file" label="Photo" />
 
-  <:actions>
-    <.button>Save Product</.button>
-  </:actions>
-</.simple_form>
+  <.button>Save Product</.button>
+</.form>
 ```
 
 When rendered, here is the HTML for the default `HelloWeb.CoreComponents` `input/1` component:
@@ -71,10 +69,10 @@ Since you generated an HTML resource, you can now start your server with `mix ph
 Before you begin, add `IO.inspect product_params` to the top of your `ProductController.create/2` action in `lib/hello_web/controllers/product_controller.ex`. This will show the `product_params` in your development log so you can get a better sense of what's happening.
 
 ```elixir
-. . .
+...
   def create(conn, %{"product" => product_params}) do
     IO.inspect product_params
-. . .
+...
 ```
 
 When you do that, this is what your `product_params` will output in the log:

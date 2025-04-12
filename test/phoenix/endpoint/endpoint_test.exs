@@ -25,9 +25,9 @@ defmodule Phoenix.Endpoint.EndpointTest do
     use Phoenix.Endpoint, otp_app: :phoenix
 
     # Assert endpoint variables
-    assert is_list(config)
     assert @otp_app == :phoenix
     assert code_reloading? == false
+    assert debug_errors? == false
   end
 
   defmodule NoConfigEndpoint do
@@ -214,6 +214,9 @@ defmodule Phoenix.Endpoint.EndpointTest do
     UrlEndpoint.start_link()
     assert UrlEndpoint.path("/phoenix.png") =~ "/api/phoenix.png"
     assert UrlEndpoint.static_path("/phoenix.png") =~ "/api/phoenix.png"
+  after
+    :code.purge(__MODULE__.UrlEndpoint)
+    :code.delete(__MODULE__.UrlEndpoint)
   end
 
   @tag :capture_log
@@ -227,6 +230,9 @@ defmodule Phoenix.Endpoint.EndpointTest do
     StaticEndpoint.start_link()
     assert StaticEndpoint.path("/phoenix.png") =~ "/phoenix.png"
     assert StaticEndpoint.static_path("/phoenix.png") =~ "/static/phoenix.png"
+  after
+    :code.purge(__MODULE__.StaticEndpoint)
+    :code.delete(__MODULE__.StaticEndpoint)
   end
 
   @tag :capture_log
@@ -243,6 +249,9 @@ defmodule Phoenix.Endpoint.EndpointTest do
     AddressEndpoint.start_link()
     assert {:ok, {{127, 0, 0, 1}, port}} = AddressEndpoint.server_info(:http)
     assert is_integer(port)
+  after
+    :code.purge(__MODULE__.AddressEndpoint)
+    :code.delete(__MODULE__.AddressEndpoint)
   end
 
   test "injects pubsub broadcast with configured server" do
@@ -359,6 +368,24 @@ defmodule Phoenix.Endpoint.EndpointTest do
 
     assert_raise ArgumentError, ~r/expected a path starting with a single/, fn ->
       Endpoint.static_integrity("//invalid_path")
+    end
+  end
+
+  test "validates websocket and longpoll socket options" do
+    assert_raise ArgumentError, ~r/unknown keys \[:invalid\]/, fn ->
+      defmodule MyInvalidSocketEndpoint1 do
+        use Phoenix.Endpoint, otp_app: :phoenix
+
+        socket "/ws", UserSocket, websocket: [path: "/ws", check_origin: false, invalid: true]
+      end
+    end
+
+    assert_raise ArgumentError, ~r/unknown keys \[:drainer\]/, fn ->
+      defmodule MyInvalidSocketEndpoint2 do
+        use Phoenix.Endpoint, otp_app: :phoenix
+
+        socket "/ws", UserSocket, longpoll: [path: "/ws", check_origin: false, drainer: []]
+      end
     end
   end
 end

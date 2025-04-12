@@ -18,7 +18,7 @@ When your browser accesses [http://localhost:4000/](http://localhost:4000/), it 
 
 There are other HTTP verbs. For example, submitting a form typically uses the POST verb.
 
-Web applications typically handle requests by mapping each verb/path pair into a specific part of your application. This matching in Phoenix is done by the router. For example, we may map "/articles" to a portion of our application that shows all articles. Therefore, to add a new page, our first task is to add a new route.
+Web applications typically handle requests by mapping each verb/path pair onto a specific part of your application. In Phoenix, this mapping is done by the router. For example, we may map "/articles" to a portion of our application that shows all articles. Therefore, to add a new page, our first task is to add a new route.
 
 ### A new route
 
@@ -103,7 +103,7 @@ We'll save a discussion of `use HelloWeb, :controller` for the [Controllers guid
 
 All controller actions take two arguments. The first is `conn`, a struct which holds a ton of data about the request. The second is `params`, which are the request parameters. Here, we are not using `params`, and we avoid compiler warnings by prefixing it with `_`.
 
-The core of this action is `render(conn, :index)`. It tells Phoenix to render the `index` template. The modules responsible for rendering are called views. By default, Phoenix views are named after the controller (`HelloController`) and format (`HTML` in this case), so Phoenix is expecting a `HelloWeb.HelloHTML` to exist and define an `index/1` function.
+The core of this action is `render(conn, :index)`. It tells Phoenix to render the `index` template. The modules responsible for rendering are called views. By default, Phoenix views are named after the controller (`HelloController`) and format (`HTML` in this case), so Phoenix is expecting a `HelloWeb.HelloHTML` module to exist and define an `index/1` function.
 
 ### A new view
 
@@ -133,7 +133,7 @@ defmodule HelloWeb.HelloHTML do
 end
 ```
 
-We defined a function that receives `assigns` as arguments and use [the `~H` sigil](https://hexdocs.pm/phoenix_live_view/Phoenix.Component.html#sigil_H/2) to put the contents we want to render. Inside the `~H` sigil, we use a templating language called HEEx, which stands for "HTML+EEx". `EEx` is a library for embedding Elixir that ships as part of Elixir itself. "HTML+EEx" is a Phoenix extension of EEx that is HTML aware, with support for HTML validation, components, and automatic escaping of values. The latter protects you from security vulnerabilities like Cross-Site-Scripting with no extra work on your part.
+We defined a function that receives `assigns` as arguments and used [the `~H` sigil](https://hexdocs.pm/phoenix_live_view/Phoenix.Component.html#sigil_H/2) to specify the content we want to render. Inside the `~H` sigil, we used a templating language called HEEx, which stands for "HTML+EEx". `EEx` is a library for embedding Elixir that ships as part of Elixir itself. "HTML+EEx" is a Phoenix extension of EEx that is HTML aware, with support for HTML validation, components, and automatic escaping of values. The latter protects you from security vulnerabilities like Cross-Site-Scripting with no extra work on your part.
 
 A template file works in the same way. Function components are great for smaller templates and separate files are a good choice when you have a lot of markup or your functions start to feel unmanageable.
 
@@ -155,7 +155,7 @@ Note the controller name (`HelloController`), the view name (`HelloHTML`), and t
 
 > **Note**: We can rename the `hello_html` directory to whatever we want and put it in a subdirectory of `lib/hello_web/controllers`, as long as we update the `embed_templates` setting accordingly. However, it's best to keep the same naming convention to prevent any confusion.
 
-```
+```console
 lib/hello_web
 ├── controllers
 │   ├── hello_controller.ex
@@ -172,21 +172,29 @@ A template file has the following structure: `NAME.FORMAT.TEMPLATING_LANGUAGE`. 
 </section>
 ```
 
-Template files are compiled into the module as function components themselves, there is no runtime or performance difference between the two styles.
+Phoenix will see the template file and compile it into an `index(assigns)` function, similar as before. There is no runtime or performance difference between the two styles.
 
-Now that we've got the route, controller, view, and template, we should be able to point our browsers at [http://localhost:4000/hello](http://localhost:4000/hello) and see our greeting from Phoenix! (In case you stopped the server along the way, the task to restart it is `mix phx.server`.)
+Now that we've got the route, controller, view, and template, we should be able to point our browser at [http://localhost:4000/hello](http://localhost:4000/hello) and see our greeting from Phoenix!
 
 ![Phoenix Greets Us](assets/images/hello-from-phoenix.png)
 
-There are a couple of interesting things to notice about what we just did. We didn't need to stop and restart the server while we made these changes. Yes, Phoenix has hot code reloading! Also, even though our `index.html.heex` file consists of only a single `section` tag, the page we get is a full HTML document. Our index template is actually rendered into layouts: first it renders `lib/hello_web/components/layouts/root.html.heex` which renders `lib/hello_web/components/layouts/app.html.heex` which finally includes our contents. If you open those files, you'll see a line that looks like this at the bottom:
+In case you stopped the server along the way, the task to restart it is `mix phx.server`. If you didn't stop it, everything should update on the fly: Phoenix has hot code reloading!
+
+> A note on hot code reloading: some editors with their automatic linters may prevent hot code reloading from working. If it's not working for you, please see the discussion in [this issue](https://github.com/phoenixframework/phoenix/issues/1165).
+
+## Layouts
+
+
+
+Also, even though our `index.html.heex` file consists of only a single `section` tag, the page we get is a full HTML document. Our index template is actually rendered into a separate layout: `lib/hello_web/components/layouts/root.html.heex`, which contains the basic HTML skeleton of the page. If you open this files, you'll see a line that looks like this at the bottom:
 
 ```heex
-<%= @inner_content %>
+{@inner_content}
 ```
 
-Which injects our template into the layout before the HTML is sent off to the browser. We will talk more about layouts in the Controllers guide.
+This line injects our template into the layout before the HTML is sent off to the browser. We will talk more about layouts in the Controllers guide.
 
-> A note on hot code reloading: Some editors with their automatic linters may prevent hot code reloading from working. If it's not working for you, please see the discussion in [this issue](https://github.com/phoenixframework/phoenix/issues/1165).
+The rest of the page structure is included in the `app` component the is defined in the `lib/hello_web/components/layouts.ex` module.
 
 ## From endpoint to views
 
@@ -215,15 +223,15 @@ Each of these plugs have a specific responsibility that we will learn later. The
 
 At this moment, you may be thinking this can be a lot of steps to simply render a page. However, as our application grows in complexity, we will see that each layer serves a distinct purpose:
 
-  * endpoint (`Phoenix.Endpoint`) - the endpoint contains the common and initial path that all requests go through. If you want something to happen on all requests, it goes to the endpoint.
+  * endpoint (`Phoenix.Endpoint`) - the endpoint contains the common and initial path that all requests go through. If you want something to happen on all requests, it goes in the endpoint.
 
-  * router (`Phoenix.Router`) - the router is responsible for dispatching verb/path to controllers. The router also allows us to scope functionality. For example, some pages in your application may require user authentication, others may not.
+  * router (`Phoenix.Router`) - the router is responsible for dispatching verb/path pairs to controllers. The router also allows us to scope functionality. For example, some pages in your application may require user authentication, others may not.
 
   * controller (`Phoenix.Controller`) - the job of the controller is to retrieve request information, talk to your business domain, and prepare data for the presentation layer.
 
   * view - the view handles the structured data from the controller and converts it to a presentation to be shown to users. Views are often named after the content format they are rendering.
 
-Let's do a quick recap on how the last three components work together by adding another page.
+Let's do a quick recap on how the last three components work together by adding another page. This time, we will use some additional features, such as layout components and content interpolation.
 
 ## Another new page
 
@@ -271,26 +279,28 @@ It's good to remember that the keys of the `params` map will always be strings, 
 
 ### Another new template
 
-For the last piece of this puzzle, we'll need a new template. Since it is for the `show` action of `HelloController`, it will go into the `lib/hello_web/controllers/hello_html` directory and be called `show.html.heex`. It will look surprisingly like our `index.html.heex` template, except that we will need to display the name of our messenger.
-
-To do that, we'll use the special HEEx tags for executing Elixir expressions: `<%=  %>`. Notice that the initial tag has an equals sign like this: `<%=` . That means that any Elixir code that goes between those tags will be executed, and the resulting value will replace the tag in the HTML output. If the equals sign were missing, the code would still be executed, but the value would not appear on the page.
-
-Remember our templates are written in HEEx (HTML+EEx). HEEx is a superset of EEx which is why it shares the `<%= %>` syntax.
-
-And this is what the template should look like:
+For the last piece of this puzzle, we'll need a new template. Since it is for the `show` action of `HelloController`, it will go into the `lib/hello_web/controllers/hello_html` directory and be called `show.html.heex`. It will look surprisingly like our `index.html.heex` template, except that we will need to display the name of our messenger. Let's write the new template down and then explain what it does:
 
 ```heex
-<section>
-  <h2>Hello World, from <%= @messenger %>!</h2>
-</section>
+<Layouts.app flash={@flash}>
+  <section>
+    <h2>Hello World, from {@messenger}!</h2>
+  </section>
+</Layouts.app>
 ```
 
-Our messenger appears as `@messenger`.
-
-The values we passed to the view from the controller are collectively called our "assigns". We could access our messenger value via `assigns.messenger` but through some metaprogramming, Phoenix gives us the much cleaner `@` syntax for use in templates.
-
-We're done. If you point your browser to [http://localhost:4000/hello/Frank](http://localhost:4000/hello/Frank), you should see a page that looks like this:
+If you point your browser to [http://localhost:4000/hello/Frank](http://localhost:4000/hello/Frank), you should see a page that looks like this:
 
 ![Frank Greets Us from Phoenix](assets/images/hello-world-from-frank.png)
 
-Play around a bit. Whatever you put after `/hello/` will appear on the page as your messenger.
+Let's break what the template does into parts. This template has the `.heex` extension. HTML templates in Phoenix are written in HEEx, which stands for (HTML + Embedded Elixir). There are three features from HEEx we are using in the template above:
+
+  * Function components, as in `<Layouts.app>` - they are the essential building block for any kind of markup-based template rendering you'll perform in Phoenix. This particular component will abstract our app layout, such as menu and sidebar, and then render the contents inside
+
+  * Content interpolation, such as `{@messenger}` - any Elixir code that goes between `{...}` will be executed, and the resulting value will replace the tag in the HTML output
+
+  * Assigns, such as `@messenger` and `@flash` - values we pass to the view from the controller are collectively called our "assigns". We could access our messenger value via `assigns.messenger` and `assigns.flash`, but Phoenix gives us the much cleaner `@` syntax for use in templates.
+
+Also note how these three features compose: we are passing the `@flash` assign as an Elixir value to the `<Layouts.app>` component. As we will learn later, flash messages are used to display temporary messages to the user, such as success or error messages.
+
+We are done! Feel free to play around a bit. Whatever you put after `/hello/` will appear on the page as your messenger.

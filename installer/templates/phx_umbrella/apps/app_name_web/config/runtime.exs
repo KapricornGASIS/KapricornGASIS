@@ -1,5 +1,3 @@
-import Config
-
 # The secret key base is used to sign/encrypt cookies and other secrets.
 # A default value is used in config/dev.exs and config/test.exs but you
 # want to use a different value for prod and you most likely don't want
@@ -75,7 +73,7 @@ config :<%= @web_app_name %>, <%= @endpoint_module %>,
 #       domain: System.get_env("MAILGUN_DOMAIN")
 #
 # For this example you need include a HTTP client required by Swoosh API client.
-# Swoosh supports Hackney and Finch out of the box:
+# Swoosh supports Hackney, Req and Finch out of the box:
 #
 #     config :swoosh, :api_client, Swoosh.ApiClient.Hackney
 #

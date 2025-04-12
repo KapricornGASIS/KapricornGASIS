@@ -15,7 +15,7 @@ defmodule HelloWeb.PageController do
   use HelloWeb, :controller
 
   def home(conn, _params) do
-    render(conn, :home, layout: false)
+    render(conn, :home)
   end
 end
 ```
@@ -47,7 +47,7 @@ defmodule HelloWeb.PageController do
   ...
 
   def index(conn, _params) do
-    render(conn, :index)
+    render(conn, :home)
   end
 end
 ```
@@ -171,7 +171,7 @@ As an example, let's take `PageController`'s `home` action from a newly generate
 
 ```elixir
 def home(conn, _params) do
-  render(conn, :home, layout: false)
+  render(conn, :home)
 end
 ```
 
@@ -181,8 +181,7 @@ What it doesn't have is a view for rendering JSON. Phoenix Controller hands off 
   def controller do
     quote do
       use Phoenix.Controller,
-        formats: [:html, :json],
-        layouts: [html: HelloWeb.Layouts]
+        formats: [:html, :json]
       ...
     end
   end
@@ -283,7 +282,7 @@ Let's change the status in our `PageController` `home` action.
 def home(conn, _params) do
   conn
   |> put_status(202)
-  |> render(:home, layout: false)
+  |> render(:home)
 end
 ```
 
@@ -329,7 +328,7 @@ Finally, let's define in the same file the action we redirect to, which simply r
 
 ```elixir
 def redirect_test(conn, _params) do
-  render(conn, :home, layout: false)
+  render(conn, :home)
 end
 ```
 
@@ -359,7 +358,7 @@ defmodule HelloWeb.PageController do
   def home(conn, _params) do
     conn
     |> put_flash(:error, "Let's pretend we have an error.")
-    |> render(:home, layout: false)
+    |> render(:home)
   end
 end
 ```

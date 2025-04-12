@@ -14,11 +14,13 @@ There are a number of places to connect with community members at all experience
 
   * Follow the Phoenix Framework on [Twitter](https://twitter.com/elixirphoenix).
 
-The Security Working Group of the Erlang Ecosystem Foundation also publishes in-depth documents about [security best practices for Erlang, Elixir, and Phoenix](https://erlef.github.io/security-wg/web_app_security_best_practices_beam/).
+The Security Working Group of the Erlang Ecosystem Foundation also publishes in-depth documents about [security best practices for Erlang, Elixir, and Phoenix](https://security.erlef.org/web_app_security_best_practices_beam/).
 
 ## Books
 
   * [Programming Phoenix LiveView - Interactive Elixir Web Programming Without Writing Any JavaScript - 2023 (by Bruce Tate and Sophie DeBenedetto)](https://pragprog.com/titles/liveview/programming-phoenix-liveview/)
+
+  * [Phoenix Tutorial (Phoenix 1.6)](https://thephoenixtutorial.org/) - [Free to read online](https://thephoenixtutorial.org/book)
 
   * [Real-Time Phoenix - Build Highly Scalable Systems with Channels (by Stephen Bussey - 2020)](https://pragprog.com/titles/sbsockets/real-time-phoenix/)
 
@@ -32,7 +34,13 @@ The Security Working Group of the Erlang Ecosystem Foundation also publishes in-
 
 ## Screencasts/Courses
 
-  * [Phoenix LiveView Free Course (by The Pragmatic Studio - 2023)](https://pragmaticstudio.com/courses/phoenix-liveview)
+  * [Full-Stack Phoenix Course (by The Pragmatic Studio - 2025)](https://pragmaticstudio.com/courses/phoenix)
+
+  * [Free Bootcamp: Fullstack Elixir and Phoenix (by TechSchool - 2024)](https://techschool.dev/en/bootcamps/fullstack-elixir-and-phoenix)
+
+  * [Learn Phoenix LiveView (by George Arrowsmith - 2024)](https://phoenixliveview.com)
+
+  * [Phoenix LiveView Course (by The Pragmatic Studio - 2023)](https://pragmaticstudio.com/courses/phoenix-liveview)
 
   * [Build It With Phoenix video course (by Geoffrey Lessel - 2023)](https://builditwithphoenix.com)
 

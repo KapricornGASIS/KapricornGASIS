@@ -38,12 +38,11 @@ defmodule <%= @web_namespace %> do
 
   def controller do
     quote do
-      use Phoenix.Controller,
-        formats: [:html, :json],
-        layouts: [html: <%= @web_namespace %>.Layouts]
+      use Phoenix.Controller, formats: [:html, :json]<%= if @gettext do %>
 
-      import Plug.Conn<%= if @gettext do %>
-      import <%= @web_namespace %>.Gettext<% end %>
+      use Gettext, backend: <%= @web_namespace %>.Gettext<% end %>
+
+      import Plug.Conn
 
       unquote(verified_routes())
     end
@@ -51,8 +50,7 @@ defmodule <%= @web_namespace %> do
 
   def live_view do
     quote do
-      use Phoenix.LiveView,
-        layout: {<%= @web_namespace %>.Layouts, :app}
+      use Phoenix.LiveView
 
       unquote(html_helpers())
     end
@@ -80,15 +78,18 @@ defmodule <%= @web_namespace %> do
   end
 
   defp html_helpers do
-    quote do
+    quote do<%= if @gettext do %>
+      # Translation
+      use Gettext, backend: <%= @web_namespace %>.Gettext
+<% end %>
       # HTML escaping functionality
       import Phoenix.HTML
-      # Core UI components and translation
-      import <%= @web_namespace %>.CoreComponents<%= if @gettext do %>
-      import <%= @web_namespace %>.Gettext<% end %>
+      # Core UI components
+      import <%= @web_namespace %>.CoreComponents
 
-      # Shortcut for generating JS commands
+      # Common modules used in templates
       alias Phoenix.LiveView.JS
+      alias <%= @web_namespace %>.Layouts
 
       # Routes generation with the ~p sigil
       unquote(verified_routes())

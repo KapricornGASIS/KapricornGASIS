@@ -28,13 +28,21 @@ defmodule Mix.Tasks.Phx.Gen.Context do
   A migration file for the repository and test files for the context
   will also be generated.
 
+  The generated migration can be skipped with `--no-migration`.
+
+  ## Scopes
+
+  If your application configures its own default [scope](scopes.md), then this generator
+  will automatically make sure all of your context operations are correctly scoped.
+  You can pass the `--no-scope` flag to disable the scoping.
+
   ## Generating without a schema
 
   In some cases, you may wish to bootstrap the context module and
   tests, but leave internal implementation of the context and schema
   to yourself. Use the `--no-schema` flags to accomplish this.
 
-  ## table
+  ## `--table`
 
   By default, the table name for the migration and schema will be
   the plural name provided for the resource. To customize this value,
@@ -42,7 +50,7 @@ defmodule Mix.Tasks.Phx.Gen.Context do
 
       $ mix phx.gen.context Accounts User users --table cms_users
 
-  ## binary_id
+  ## `--binary-id`
 
   Generated migration can use `binary_id` for schema's primary key
   and its references with option `--binary-id`.
@@ -88,7 +96,12 @@ defmodule Mix.Tasks.Phx.Gen.Context do
     context_app: :string,
     merge_with_existing_context: :boolean,
     prefix: :string,
-    live: :boolean
+    live: :boolean,
+    compile: :boolean,
+    primary_key: :string,
+    migration: :boolean,
+    scope: :string,
+    no_scope: :boolean
   ]
 
   @default_opts [schema: true, context: true]
@@ -102,7 +115,14 @@ defmodule Mix.Tasks.Phx.Gen.Context do
     end
 
     {context, schema} = build(args)
-    binding = [context: context, schema: schema]
+
+    binding = [
+      context: context,
+      schema: schema,
+      scope: context.scope,
+      primary_key: schema.opts[:primary_key] || :id
+    ]
+
     paths = Mix.Phoenix.generator_paths()
 
     prompt_for_conflicts(context)
@@ -178,6 +198,13 @@ defmodule Mix.Tasks.Phx.Gen.Context do
   defp inject_schema_access(%Context{file: file} = context, paths, binding) do
     ensure_context_file_exists(context, paths, binding)
 
+    binding =
+      if File.exists?(file) and File.read!(file) =~ "defp broadcast" do
+        [{:add_broadcast, false} | binding]
+      else
+        [{:add_broadcast, true} | binding]
+      end
+
     paths
     |> Mix.Phoenix.eval_from(
       "priv/templates/phx.gen.context/#{schema_access_template(context)}",
@@ -203,8 +230,15 @@ defmodule Mix.Tasks.Phx.Gen.Context do
   defp inject_tests(%Context{test_file: test_file} = context, paths, binding) do
     ensure_test_file_exists(context, paths, binding)
 
+    file =
+      if context.schema.scope do
+        "test_cases_scope.exs"
+      else
+        "test_cases.exs"
+      end
+
     paths
-    |> Mix.Phoenix.eval_from("priv/templates/phx.gen.context/test_cases.exs", binding)
+    |> Mix.Phoenix.eval_from("priv/templates/phx.gen.context/#{file}", binding)
     |> inject_eex_before_final_end(test_file, binding)
   end
 
@@ -301,10 +335,18 @@ defmodule Mix.Tasks.Phx.Gen.Context do
   end
 
   defp schema_access_template(%Context{schema: schema}) do
-    if schema.generate? do
-      "schema_access.ex"
-    else
-      "access_no_schema.ex"
+    cond do
+      schema.generate? && schema.scope ->
+        "schema_access_scope.ex"
+
+      schema.generate? ->
+        "schema_access.ex"
+
+      schema.scope ->
+        "access_no_schema_scope.ex"
+
+      true ->
+        "access_no_schema.ex"
     end
   end
 
@@ -387,7 +429,7 @@ defmodule Mix.Tasks.Phx.Gen.Context do
 
         * If they are not closely related, another context probably works better
 
-      The fact two entities are related in the database does not mean they belong \
+      The fact that two entities are related in the database does not mean they belong \
       to the same context.
 
       If you are not sure, prefer creating a new context over adding to the existing one.

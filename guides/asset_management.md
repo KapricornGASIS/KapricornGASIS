@@ -4,7 +4,7 @@ Beside producing HTML, most web applications have various assets (JavaScript, CS
 
 From Phoenix v1.7, new applications use [esbuild](https://esbuild.github.io/) to prepare assets via the [Elixir esbuild wrapper](https://github.com/phoenixframework/esbuild), and [tailwindcss](https://tailwindcss.com) via the [Elixir tailwindcss wrapper](https://github.com/phoenixframework/tailwind) for CSS. The direct integration with `esbuild` and `tailwind` means that newly generated applications do not have dependencies on Node.js or an external build system (e.g. Webpack).
 
-Your JavaScript is typically placed at "assets/js/app.js" and `esbuild` will extract it to "priv/static/assets/app.js". In development, this is done automatically via the `esbuild` watcher. In production, this is done by running `mix assets.deploy`.
+Your JavaScript is typically placed at "assets/js/app.js" and `esbuild` will extract it to "priv/static/assets/js/app.js". In development, this is done automatically via the `esbuild` watcher. In production, this is done by running `mix assets.deploy`.
 
 `esbuild` can also handle your CSS files, but by default `tailwind` handles all CSS building.
 
@@ -16,13 +16,13 @@ If you want to import JavaScript dependencies, you have at least three options t
 
 1. Vendor those dependencies inside your project and import them in your "assets/js/app.js" using a relative path:
 
-   ```js
+   ```javascript
    import topbar from "../vendor/topbar"
    ```
 
-2. Call `npm install topbar --save` inside your assets directory and `esbuild` will be able to automatically pick them up:
+2. Call `npm install topbar --prefix assets` will create `package.json` and `package-lock.json` inside your assets directory and `esbuild` will be able to automatically pick them up:
 
-   ```js
+   ```javascript
    import topbar from "topbar"
    ```
 
@@ -35,7 +35,7 @@ If you want to import JavaScript dependencies, you have at least three options t
 
    Run `mix deps.get` to fetch the dependency and then import it:
 
-   ```js
+   ```javascript
    import topbar from "topbar"
    ```
 
@@ -45,6 +45,10 @@ If you want to import JavaScript dependencies, you have at least three options t
    update thanks to Mix. It is important to note that git dependencies cannot
    be used by Hex packages, so if you intend to publish your project to Hex,
    consider vendoring the files instead.
+
+Note that if you use third party JS package managers, you might need to adjust your deployment steps
+to properly include the packages. If you're using `mix phx.gen.release --docker`, have a look at the
+[documentation](Mix.Tasks.Phx.Gen.Release.html#module-docker) for further details.
 
 ## Images, fonts, and external files
 
@@ -67,7 +71,7 @@ error: Could not resolve "/images/bg.png" (mark it as external to exclude it fro
 Given the images are already managed by Phoenix, you need to mark all resources from `/images` (and also `/fonts`) as external, as the error message says. This is what Phoenix does by default for new apps since v1.6.1+. In your `config/config.exs`, you will find:
 
 ```elixir
-args: ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*),
+args: ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/*),
 ```
 
 If you need to reference other directories, you need to update the arguments above accordingly. Note running `mix phx.digest` will create digested files for all of the assets in `priv/static`, so your images and fonts are still cache-busted.
@@ -76,7 +80,7 @@ If you need to reference other directories, you need to update the arguments abo
 
 Phoenix's default configuration of `esbuild` (via the Elixir wrapper) does not allow you to use [esbuild plugins](https://esbuild.github.io/plugins/). If you want to use an esbuild plugin, for example to compile SASS files to CSS, you can replace the default build system with a custom build script.
 
-The following is an example of a custom build using esbuild via Node.JS. First of all, you'll need to install Node.js in development and make it available for your production build step.
+The following is an example of a custom build using esbuild via Node.js. First of all, you'll need to install Node.js in development and make it available for your production build step.
 
 Then you'll need to add `esbuild` to your Node.js packages and the Phoenix packages. Inside the `assets` directory, run:
 
@@ -94,7 +98,7 @@ $ yarn add ../deps/phoenix ../deps/phoenix_html ../deps/phoenix_live_view
 
 Next, add a custom JavaScript build script. We'll call the example `assets/build.js`:
 
-```js
+```javascript
 const esbuild = require("esbuild");
 
 const args = process.argv.slice(2);
@@ -114,7 +118,7 @@ let opts = {
   entryPoints: ["js/app.js"],
   bundle: true,
   logLevel: "info",
-  target: "es2017",
+  target: "es2022",
   outdir: "../priv/static/assets",
   external: ["*.css", "fonts/*", "images/*"],
   nodePaths: ["../deps"],

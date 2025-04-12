@@ -53,7 +53,7 @@ defmodule Mix.Tasks.Phx.New do
 
     * `--no-html` - do not generate HTML views
 
-    * `--no-live` - comment out LiveView socket setup in your Endpoint 
+    * `--no-live` - comment out LiveView socket setup in your Endpoint
       and assets/js/app.js. Automatically disabled if --no-html is given
 
     * `--no-mailer` - do not generate Swoosh mailer files
@@ -68,6 +68,8 @@ defmodule Mix.Tasks.Phx.New do
     * `--verbose` - use verbose output
 
     * `-v`, `--version` - prints the Phoenix installer version
+
+    * `--no-version-check` - skip the version check for the latest phx_new version
 
   When passing the `--no-ecto` flag, Phoenix generators such as
   `phx.gen.html`, `phx.gen.json`, `phx.gen.live`, and `phx.gen.context`
@@ -113,6 +115,34 @@ defmodule Mix.Tasks.Phx.New do
 
   You can read more about umbrella projects using the
   official [Elixir guide](https://hexdocs.pm/elixir/dependencies-and-umbrella-projects.html#umbrella-projects)
+
+  ## `PHX_NEW_CACHE_DIR`
+
+  In rare cases, it may be useful to copy the build from a previously
+  cached build. To do this, set the `PHX_NEW_CACHE_DIR` environment
+  variable before running `mix phx.new`. For example, you could generate a
+  cache by running:
+
+  ```shell
+  mix phx.new mycache --no-install && cd mycache \
+    && mix deps.get && mix deps.compile && mix assets.setup \
+    && rm -rf assets config lib priv test mix.exs README.md
+  ```
+
+  Your cached build directory should contain:
+
+      _build
+      deps
+      mix.lock
+
+  Then you could run:
+
+  ```shell
+  PHX_NEW_CACHE_DIR=/path/to/mycache mix phx.new myapp
+  ```
+
+  The entire cache directory will be copied to the new project, replacing
+  any existing files where conflicts exist.
   """
   use Mix.Task
   alias Phx.New.{Generator, Project, Single, Umbrella, Web, Ecto}
@@ -140,8 +170,13 @@ defmodule Mix.Tasks.Phx.New do
     install: :boolean,
     prefix: :string,
     mailer: :boolean,
-    adapter: :string
+    adapter: :string,
+    inside_docker_env: :boolean,
+    from_elixir_install: :boolean,
+    version_check: :boolean
   ]
+
+  @reserved_app_names ~w(server table)
 
   @impl true
   def run([version]) when version in ~w(-v --version) do
@@ -151,17 +186,40 @@ defmodule Mix.Tasks.Phx.New do
   def run(argv) do
     elixir_version_check!()
 
-    case OptionParser.parse!(argv, strict: @switches) do
-      {_opts, []} ->
-        Mix.Tasks.Help.run(["phx.new"])
+    {opts, argv} = OptionParser.parse!(argv, strict: @switches)
 
-      {opts, [base_path | _]} ->
-        if opts[:umbrella] do
-          generate(base_path, Umbrella, :project_path, opts)
-        else
-          generate(base_path, Single, :base_path, opts)
-        end
+    version_task =
+      if Keyword.get(opts, :version_check, true) do
+        get_latest_version("phx_new")
+      end
+
+    result =
+      case {opts, argv} do
+        {_opts, []} ->
+          Mix.Tasks.Help.run(["phx.new"])
+
+        {opts, [base_path | _]} ->
+          if opts[:umbrella] do
+            generate(base_path, Umbrella, :project_path, opts)
+          else
+            generate(base_path, Single, :base_path, opts)
+          end
+      end
+
+    if version_task do
+      try do
+        # if we get anything else than a `Version`, we'll get a MatchError
+        # and fail silently
+        %Version{} = latest_version = Task.await(version_task, 3_000)
+        maybe_warn_outdated(latest_version)
+      rescue
+        _ -> :ok
+      catch
+        :exit, _ -> :ok
+      end
     end
+
+    result
   end
 
   @doc false
@@ -181,7 +239,8 @@ defmodule Mix.Tasks.Phx.New do
     |> Generator.put_binding()
     |> validate_project(path)
     |> generator.generate()
-    |> prompt_to_install_deps(generator, path)
+    |> maybe_copy_cached_build(path)
+    |> maybe_prompt_to_install_deps(generator, path)
   end
 
   defp validate_project(%Project{opts: opts} = project, path) do
@@ -191,6 +250,15 @@ defmodule Mix.Tasks.Phx.New do
     check_module_name_availability!(project.root_mod)
 
     project
+  end
+
+  defp maybe_prompt_to_install_deps(%Project{} = project, generator, path_key) do
+    # we can skip the install deps setup, even with --install, because we already copied deps
+    if project.cached_build_path do
+      project
+    else
+      prompt_to_install_deps(project, generator, path_key)
+    end
   end
 
   defp prompt_to_install_deps(%Project{} = project, generator, path_key) do
@@ -213,19 +281,17 @@ defmodule Mix.Tasks.Phx.New do
           Mix.shell().info([:green, "* running ", :reset, "mix assets.setup"])
 
           # First compile only builders so we can install in parallel
-          # TODO: Once we require Erlang/OTP 28, castore and jason may no longer be required
-          cmd(project, "mix deps.compile castore jason #{Enum.join(builders, " ")}", log: false)
+          # TODO: Once we require Erlang/OTP 28, jason may no longer be required
+          cmd(project, "mix deps.compile jason #{Enum.join(builders, " ")}", log: false)
         end
 
         tasks =
           Enum.map(builders, fn builder ->
-            cmd = "mix do loadpaths --no-compile + #{builder}.install"
+            cmd = "mix do loadpaths --no-compile --no-listeners + #{builder}.install"
             Task.async(fn -> cmd(project, cmd, log: false, cd: project.web_path) end)
           end)
 
-        if rebar_available?() do
-          cmd(project, "mix deps.compile")
-        end
+        cmd(project, "mix deps.compile")
 
         Task.await_many(tasks, :infinity)
       end
@@ -254,20 +320,11 @@ defmodule Mix.Tasks.Phx.New do
   defp maybe_cd(path, func), do: path && File.cd!(path, func)
 
   defp install_mix(project, install?) do
-    if install? && hex_available?() do
+    if install? do
       cmd(project, "mix deps.get")
     else
       ["$ mix deps.get"]
     end
-  end
-
-  # TODO: Elixir v1.15 automatically installs Hex/Rebar if missing, so we can simplify this.
-  defp hex_available? do
-    Code.ensure_loaded?(Hex)
-  end
-
-  defp rebar_available? do
-    Mix.Rebar.rebar_cmd(:rebar3)
   end
 
   defp print_missing_steps(steps) do
@@ -340,7 +397,22 @@ defmodule Mix.Tasks.Phx.New do
   end
 
   defp check_app_name!(name, from_app_flag) do
-    unless name =~ Regex.recompile!(~r/^[a-z][\w_]*$/) do
+    with :ok <- validate_not_reserved(name),
+         :ok <- validate_app_name_format(name, from_app_flag) do
+      :ok
+    end
+  end
+
+  defp validate_not_reserved(name) when name in @reserved_app_names do
+    Mix.raise("Application name cannot be #{inspect(name)} as it is reserved")
+  end
+
+  defp validate_not_reserved(_name), do: :ok
+
+  defp validate_app_name_format(name, from_app_flag) do
+    if name =~ ~r/^[a-z][a-z0-9_]*$/ do
+      :ok
+    else
       extra =
         if !from_app_flag do
           ". The application name is inferred from the path, if you'd like to " <>
@@ -389,11 +461,115 @@ defmodule Mix.Tasks.Phx.New do
   end
 
   defp elixir_version_check! do
-    unless Version.match?(System.version(), "~> 1.14") do
+    unless Version.match?(System.version(), "~> 1.15") do
       Mix.raise(
-        "Phoenix v#{@version} requires at least Elixir v1.14\n " <>
+        "Phoenix v#{@version} requires at least Elixir v1.15\n " <>
           "You have #{System.version()}. Please update accordingly"
       )
     end
+  end
+
+  defp maybe_copy_cached_build(%Project{} = project, path_key) do
+    project_path = Map.fetch!(project, path_key)
+
+    case System.fetch_env("PHX_NEW_CACHE_DIR") do
+      {:ok, cache_dir} ->
+        copy_cached_build(%{project_path: project_path, cache_dir: cache_dir})
+        %{project | cached_build_path: cache_dir}
+
+      :error ->
+        project
+    end
+  end
+
+  defp copy_cached_build(%{project_path: project_path, cache_dir: cache_dir}) do
+    if File.exists?(cache_dir) do
+      Mix.shell().info("Copying cached build from #{cache_dir}")
+      System.cmd("cp", ["-Rp", Path.join(cache_dir, "."), project_path])
+    end
+  end
+
+  defp maybe_warn_outdated(latest_version) do
+    if Version.compare(@version, latest_version) == :lt do
+      Mix.shell().info([
+        :yellow,
+        "A new version of phx.new is available:",
+        :green,
+        " v#{latest_version}",
+        :reset,
+        ".",
+        "\n",
+        "You are currently running ",
+        :red,
+        "v#{@version}",
+        :reset,
+        ".\n",
+        "To update, run:\n\n",
+        "    $ mix local.phx\n"
+      ])
+    end
+  end
+
+  # we need to parse JSON, so we only check for new versions on Elixir 1.18+
+  if Version.match?(System.version(), "~> 1.18") do
+    defp get_latest_version(package) do
+      Task.async(fn ->
+        # ignore any errors to not prevent the generators from running
+        # due to any issues while checking the version
+        try do
+          with {:ok, package} <- get_package(package) do
+            versions =
+              for release <- package["releases"],
+                  version = Version.parse!(release["version"]),
+                  # ignore pre-releases like release candidates, etc.
+                  version.pre == [] do
+                version
+              end
+
+            Enum.max(versions, Version)
+          end
+        rescue
+          e -> {:error, e}
+        catch
+          :exit, _ -> {:error, :exit}
+        end
+      end)
+    end
+
+    defp get_package(name) do
+      http_options =
+        [
+          ssl: [
+            verify: :verify_peer,
+            cacerts: :public_key.cacerts_get(),
+            depth: 2,
+            customize_hostname_check: [
+              match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+            ],
+            versions: [:"tlsv1.2", :"tlsv1.3"]
+          ]
+        ]
+
+      options = [body_format: :binary]
+
+      case :httpc.request(
+             :get,
+             {~c"https://hex.pm/api/packages/#{name}",
+              [{~c"user-agent", ~c"Mix.Tasks.Phx.New/#{@version}"}]},
+             http_options,
+             options
+           ) do
+        {:ok, {{_, 200, _}, _headers, body}} ->
+          {:ok, JSON.decode!(body)}
+
+        {:ok, {{_, status, _}, _, _}} ->
+          {:error, status}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  else
+    defp get_latest_version(_), do: nil
   end
 end

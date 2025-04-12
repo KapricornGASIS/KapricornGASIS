@@ -1,12 +1,14 @@
 defmodule Phoenix.VerifiedRoutes do
-  @moduledoc ~S"""
+  @moduledoc ~S'''
   Provides route generation with compile-time verification.
 
   Use of the `sigil_p` macro allows paths and URLs throughout your
   application to be compile-time verified against your Phoenix router(s).
   For example, the following path and URL usages:
 
+      ~H"""
       <.link href={~p"/sessions/new"} method="post">Log in</.link>
+      """
 
       redirect(to: url(~p"/posts/#{post}"))
 
@@ -17,8 +19,10 @@ defmodule Phoenix.VerifiedRoutes do
 
   Unmatched routes will issue compiler warnings:
 
-      warning: no route path for AppWeb.Router matches "/postz/#{post}"
-        lib/app_web/controllers/post_controller.ex:100: AppWeb.PostController.show/2
+  ```console
+  warning: no route path for AppWeb.Router matches "/postz/#{post}"
+    lib/app_web/controllers/post_controller.ex:100: AppWeb.PostController.show/2
+  ```
 
   Additionally, interpolated ~p values are encoded via the `Phoenix.Param` protocol.
   For example, a `%Post{}` struct in your application may derive the `Phoenix.Param`
@@ -26,8 +30,7 @@ defmodule Phoenix.VerifiedRoutes do
   use `~p"/posts/#{post}"` rather than `~p"/posts/#{post.slug}"` throughout your
   application. See the `Phoenix.Param` documentation for more details.
 
-  Query strings are also supported in verified routes, either in traditional query
-  string form:
+  Finally, query strings are also supported in verified routes, either in traditional form:
 
       ~p"/posts?page=#{page}"
 
@@ -39,14 +42,46 @@ defmodule Phoenix.VerifiedRoutes do
   Like path segments, query strings params are proper URL encoded and may be interpolated
   directly into the ~p string.
 
+  ## What about named routes?
+
+  Many web frameworks, and early versions of Phoenix, provided a feature called "named routes".
+  The idea is that, when you define routes in your web applications, you could give them names
+  too. In Phoenix that was done as follows:
+
+      get "/login", SessionController, :create, as: :login
+
+  And now you could generate the route using the `login_path` function.
+
+  Named routes exist to avoid hardcoding routes in your templates, if you wrote `<a href="/login">`
+  and then changed your router, the link would point to a page that no longer exist. By using
+  `login_path`, we make sure it always points to a valid URL in our router. However, named routes
+  come with the downsides of indirection: when you look at the code, it is not immediately clear
+  which URL will be generated. Furthermore, if you have an existing URL and you want to add it
+  to a template, you need to do a reverse lookup and find its name in the router. At the end of
+  the day, named routes are arbitrary names that need to be memorized by developers, adding
+  cognitive overhead.
+
+  Verified routes tackle this problem by allowing the routes to be written as we would read them
+  in a browser, but using the `~p` sigil to guarantee they actually exist at compilation time.
+  They remove the indirection of named routes while keeping their guarantees.
+
+  In any case, if part of your application requires features similar to named routes, then
+  remember you can still leverage Elixir features to achieve the same result. For example,
+  you can define several functions as named routes to be reused across modules:
+
+      def login_path, do: ~p"/login"
+      def user_home_path(user), do: ~p"/users/#{user.username}"
+
   ## Options
 
   To verify routes in your application modules, such as controller, templates, and views,
   `use Phoenix.VerifiedRoutes`, which supports the following options:
 
-    * `:router` - The required router to verify ~p paths against
-    * `:endpoint` - The optional endpoint for ~p script_name and URL generation
-    * `:statics` - The optional list of static directories to treat as verified paths
+    * `:router` - The required router to verify `~p` paths against
+    * `:endpoint` - Optional endpoint for URL generation
+    * `:statics` - Optional list of static directories to treat as verified paths
+    * `:path_prefixes` - Optional list of path prefixes to be added to every generated path.
+      See "Path prefixes" for more information
 
   For example:
 
@@ -55,7 +90,7 @@ defmodule Phoenix.VerifiedRoutes do
         endpoint: AppWeb.Endpoint,
         statics: ~w(images)
 
-  ## Usage
+  ## Connection/socket-based route generation
 
   The majority of path and URL generation needs your application will be met
   with `~p` and `url/1`, where all information necessary to construct the path
@@ -75,38 +110,112 @@ defmodule Phoenix.VerifiedRoutes do
       such as library code, or application code that relies on multiple routers. In such cases,
       the router module can be provided explicitly to `path/3` and `url/3`.
 
-  ## Tracking Warnings
+  ## Tracking warnings
 
   All static path segments must start with forward slash, and you must have a static segment
   between dynamic interpolations in order for a route to be verified without warnings.
-  For example, the following path generates proper warnings
+  For example, imagine you have these two routes:
 
-      ~p"/media/posts/#{post}"
+      get "/media/posts/:id"
+      get "/media/images/:id"
 
-  While this one will not allow the compiler to see the full path:
+  The following route will be verified and emit a warning as it does not match the router:
 
-      type = "posts"
+      ~p"/media/post/#{post}"
+
+  However the one below will not, the "post" segment is dynamic:
+
+      type = "post"
       ~p"/media/#{type}/#{post}"
 
-  In such cases, it's better to write a function such as `media_path/1` which branches
-  on different `~p`'s to handle each type.
+  If you find yourself needing to generate dynamic URLs which are defined statically
+  in the router, that's a good indicator you should refactor it into one or more
+  function, such as `posts_path/1` and `images_path/1`.
 
   Like any other compilation warning, the Elixir compiler will warn any time the file
-  that a ~p resides in changes, or if the router is changed. To view previously issued
-  warnings for files that lack new changes, the `--all-warnings` flag may be passed to
-  the `mix compile` task. For the following will show all warnings the compiler
-  has previously encountered when compiling the current application code:
+  that a `~p` resides in changes, or if the router is changed.
 
-      $ mix compile --all-warnings
+  ## Localized routes and path prefixes
 
-  *Note: Elixir >= 1.14.0 is required for comprehensive warnings. Older versions
-  will compile properly, but no warnings will be issued.
-  """
+  Applications that need to support internationalization (i18n) and localization (l10n)
+  often do so at the URL level. In such cases, there are different approaches one can
+  choose.
+
+  One option is to perform i18n at the domain level. You can have `example.com` (in which
+  you would detect the locale based on the "Accept-Language" HTTP header), `en.example.com`,
+  `en-GB.example.com` and so forth. In this case, you would have a plug that looks at the
+  host and at HTTP headers and calls `Gettext.get_locale/1` accordingly. The biggest benefit
+  of this approach is that you don't have to change the routes in your application and
+  verified routes works as is.
+
+  Some applications, however, like to add the locale as part of the URL prefix:
+
+      scope "/:locale" do
+        get "/posts"
+        get "/images"
+      end
+
+  For such cases, VerifiedRoutes allow you to configure a `path_prefixes` option, which
+  is a list of segments to prepend to the URL. For example:
+
+      use Phoenix.VerifiedRoutes,
+        router: AppWeb.Router,
+        endpoint: AppWeb.Endpoint,
+        path_prefixes: [{Gettext, :get_locale, []}]
+
+  The above will prepend `"/#{Gettext.get_locale()}"` to every path and url generated with
+  `~p`. If your website has a handful of URLs that do not require the locale prefix, then
+  we suggest defining them in a separate module, where you use `Phoenix.VerifiedRoutes`
+  without the prefix option:
+
+      defmodule UnlocalizedRoutes do
+        use Phoenix.VerifiedRoutes,
+          router: AppWeb.Router,
+          endpoint: AppWeb.Endpoint,
+
+        # Since :path_prefixes was not declared,
+        # the code below won't prepend the locale and still be verified
+        def root, do: ~p"/"
+      end
+
+  Finally, for even more complex use cases, where the whole URL needs to localized,
+  see projects such as [`routex`](https://hex.pm/packages/routex) and
+  [`ex_cldr_routes`](https://hex.pm/packages/ex_cldr_routes).
+
+  ## Usage with custom plugs
+
+  Sometimes, when we want to do dynamic routing, we will forward to custom plugs.
+  It is possible to make these dynamic routers support `mix phx.routes` and verified
+  routes at compile time by adopting the `Phoenix.VerifiedRoutes` behaviour.
+  For example:
+
+      defmodule MyApp.LocaleRouter do
+        use Plug.Router
+        @behaviour Phoenix.VerifiedRoutes
+
+        # custom routing rules
+
+        # for displaying in `mix phx.routes`
+        def formatted_routes(plug_opts) do
+          for locale <- supported_locales(plug_opts) do
+            %{verb: "GET", path: "/#{locale}/*subpath"}
+          end
+        end
+
+        def verified_route?(plug_opts, path) do
+          plug_opts
+          |> supported_locales()
+          |> Enum.any?(fn locale ->
+            Enum.at(path, 0) == locale
+          end)
+        end
+      end
+  '''
   @doc false
   defstruct router: nil,
             route: nil,
             inspected_route: nil,
-            stacktrace: nil,
+            warn_location: nil,
             test_path: nil
 
   defmacro __using__(opts) do
@@ -142,8 +251,44 @@ defmodule Phoenix.VerifiedRoutes do
         other -> raise ArgumentError, "expected statics to be a list, got: #{inspect(other)}"
       end
 
-    Module.put_attribute(mod, :phoenix_verified_statics, statics)
+    path_prefixes =
+      case Keyword.get(opts, :path_prefixes, []) do
+        list when is_list(list) ->
+          list
+
+        other ->
+          raise ArgumentError,
+                "expected path_prefixes to be a list of zero-arity functions, got: #{inspect(other)}"
+      end
+
+    Module.put_attribute(mod, :phoenix_verified_config, %{
+      statics: statics,
+      path_prefixes: path_prefixes
+    })
   end
+
+  @type plug_opts :: any()
+  @type formatted_route :: %{
+          required(:verb) => String.t(),
+          required(:path) => String.t(),
+          required(:label) => String.t()
+        }
+
+  @doc """
+  Returns the necessary information about routes for display in `mix phx.routes`.
+
+  The `plug_opts` is typically only passed when the router is mounted within
+  a `Phoenix.Router`. Otherwise it defaults to `[]`.
+  """
+  @callback formatted_routes(plug_opts()) :: [formatted_route()]
+
+  @doc """
+  Returns `true` if the path is verified, and false if not.
+
+  The `plug_opts` is typically only passed when the router is mounted within
+  a `Phoenix.Router`. Otherwise it defaults to `[]`.
+  """
+  @callback verified_route?(plug_opts(), [String.t()]) :: boolean()
 
   @after_verify_supported Version.match?(System.version(), ">= 1.14.0")
 
@@ -163,13 +308,23 @@ defmodule Phoenix.VerifiedRoutes do
   @doc false
   def __verify__(routes) when is_list(routes) do
     Enum.each(routes, fn %__MODULE__{} = route ->
-      unless match_route?(route.router, route.test_path) do
+      test_path = split_test_path(route.test_path)
+
+      unless route.router.verified_route?([], test_path) do
         IO.warn(
           "no route path for #{inspect(route.router)} matches #{route.inspected_route}",
-          route.stacktrace
+          route.warn_location
         )
       end
     end)
+  end
+
+  defp split_test_path(test_path) do
+    test_path
+    |> String.split("#")
+    |> Enum.at(0)
+    |> String.split("/")
+    |> Enum.filter(fn segment -> segment != "" end)
   end
 
   defp expand_alias({:__aliases__, _, _} = alias, env),
@@ -253,10 +408,10 @@ defmodule Phoenix.VerifiedRoutes do
   @doc ~S'''
   Generates the router path with route verification.
 
-  See `sigil_p/1` for more information.
+  See `sigil_p/2` for more information.
 
   Warns when the provided path does not match against the router specified
-  in `use Phoenix.VerifiedRoutes` or the `@router` module attribute.
+  in the router argument.
 
   ## Examples
 
@@ -285,6 +440,27 @@ defmodule Phoenix.VerifiedRoutes do
 
   defmacro path(_endpoint, _router, other), do: raise_invalid_route(other)
 
+  @doc ~S'''
+  Generates the router path with route verification.
+
+  See `sigil_p/2` for more information.
+
+  Warns when the provided path does not match against the router specified
+  in `use Phoenix.VerifiedRoutes` or the `@router` module attribute.
+
+  ## Examples
+
+      import Phoenix.VerifiedRoutes
+
+      redirect(to: path(conn, ~p"/users/top"))
+
+      redirect(to: path(conn, ~p"/users/#{@user}"))
+
+      ~H"""
+      <.link href={path(@uri, "/users?page=#{@page}")}>profile</.link>
+      <.link href={path(@uri, "/users?#{@params}")}>profile</.link>
+      """
+  '''
   defmacro path(
              conn_or_socket_or_endpoint_or_uri,
              {:sigil_p, _, [{:<<>>, _meta, _segments} = route, extra]} = sigil_p
@@ -390,8 +566,21 @@ defmodule Phoenix.VerifiedRoutes do
 
   @doc """
   Generates url to a static asset given its file path.
+
+  See `c:Phoenix.Endpoint.static_url/0` and `c:Phoenix.Endpoint.static_path/1` for more information.
+
+  ## Examples
+
+      iex> static_url(conn, "/assets/js/app.js")
+      "https://example.com/assets/js/app-813dfe33b5c7f8388bccaaa38eec8382.js"
+
+      iex> static_url(socket, "/assets/js/app.js")
+      "https://example.com/assets/js/app-813dfe33b5c7f8388bccaaa38eec8382.js"
+
+      iex> static_url(AppWeb.Endpoint, "/assets/js/app.js")
+      "https://example.com/assets/js/app-813dfe33b5c7f8388bccaaa38eec8382.js"
   """
-  def static_url(conn_or_socket_or_endpoint_or_uri, path)
+  def static_url(conn_or_socket_or_endpoint, path)
 
   def static_url(%Plug.Conn{private: private}, path) do
     case private do
@@ -410,7 +599,7 @@ defmodule Phoenix.VerifiedRoutes do
 
   def static_url(other, path) do
     raise ArgumentError,
-          "expected a %Plug.Conn{}, a %Phoenix.Socket{}, a %URI{}, a struct with an :endpoint key, " <>
+          "expected a %Plug.Conn{}, a %Phoenix.Socket{}, a struct with an :endpoint key, " <>
             "or a Phoenix.Endpoint when building static url for #{path}, got: #{inspect(other)}"
   end
 
@@ -463,6 +652,22 @@ defmodule Phoenix.VerifiedRoutes do
 
   @doc """
   Generates path to a static asset given its file path.
+
+  See `c:Phoenix.Endpoint.static_path/1` for more information.
+
+  ## Examples
+
+      iex> static_path(conn, "/assets/js/app.js")
+      "/assets/js/app-813dfe33b5c7f8388bccaaa38eec8382.js"
+
+      iex> static_path(socket, "assets/js/app.js")
+      "/assets/js/app-813dfe33b5c7f8388bccaaa38eec8382.js"
+
+      iex> static_path(AppWeb.Endpoint, "assets/js/app.js")
+      "/assets/js/app-813dfe33b5c7f8388bccaaa38eec8382.js"
+
+      iex> static_path(%URI{path: "/subresource"}, "/assets/js/app.js")
+      "/subresource/assets/js/app-813dfe33b5c7f8388bccaaa38eec8382.js"
   """
   def static_path(conn_or_socket_or_endpoint_or_uri, path)
 
@@ -646,8 +851,21 @@ defmodule Phoenix.VerifiedRoutes do
 
   @doc """
   Generates an integrity hash to a static asset given its file path.
+
+  See `c:Phoenix.Endpoint.static_integrity/1` for more information.
+
+  ## Examples
+
+      iex> static_integrity(conn, "/assets/js/app.js")
+      "813dfe33b5c7f8388bccaaa38eec8382"
+
+      iex> static_integrity(socket, "/assets/js/app.js")
+      "813dfe33b5c7f8388bccaaa38eec8382"
+
+      iex> static_integrity(AppWeb.Endpoint, "/assets/js/app.js")
+      "813dfe33b5c7f8388bccaaa38eec8382"
   """
-  def static_integrity(conn_or_socket_or_endpoint_or_uri, path)
+  def static_integrity(conn_or_socket_or_endpoint, path)
 
   def static_integrity(%Plug.Conn{private: %{phoenix_endpoint: endpoint}}, path) do
     static_integrity(endpoint, path)
@@ -677,37 +895,8 @@ defmodule Phoenix.VerifiedRoutes do
   defp to_param(true), do: "true"
   defp to_param(data), do: Phoenix.Param.to_param(data)
 
-  defp match_route?(router, test_path) when is_binary(test_path) do
-    split_path =
-      test_path
-      |> String.split("#")
-      |> Enum.at(0)
-      |> String.split("/")
-      |> Enum.filter(fn segment -> segment != "" end)
-
-    match_route?(router, split_path)
-  end
-
-  defp match_route?(router, split_path) when is_list(split_path) do
-    case router.__verify_route__(split_path) do
-      {_forward_plug, true = _warn_on_verify?} -> false
-      {nil = _forward_plug, false = _warn_on_verify?} -> true
-      {fwd_plug, false = _warn_on_verify?} -> match_forward_route?(router, fwd_plug, split_path)
-      :error -> false
-    end
-  end
-
-  defp match_forward_route?(router, forward_router, split_path) do
-    if function_exported?(forward_router, :__routes__, 0) do
-      script_name = router.__forward__(forward_router)
-      match_route?(forward_router, split_path -- script_name)
-    else
-      true
-    end
-  end
-
   defp build_route(route_ast, sigil_p, env, endpoint_ctx, router) do
-    statics = Module.get_attribute(env.module, :phoenix_verified_statics, [])
+    config = Module.get_attribute(env.module, :phoenix_verified_config, [])
 
     router =
       case Macro.expand(router, env) do
@@ -722,12 +911,12 @@ defmodule Phoenix.VerifiedRoutes do
           """
       end
 
-    {static?, test_path, path_ast, static_ast} =
-      rewrite_path(route_ast, endpoint_ctx, router, statics)
+    {static?, meta, test_path, path_ast, static_ast} =
+      rewrite_path(route_ast, endpoint_ctx, router, config)
 
     route = %__MODULE__{
       router: router,
-      stacktrace: Macro.Env.stacktrace(env),
+      warn_location: warn_location(meta, env),
       inspected_route: Macro.to_string(sigil_p),
       test_path: test_path
     }
@@ -735,25 +924,41 @@ defmodule Phoenix.VerifiedRoutes do
     {route, static?, endpoint_ctx, route_ast, path_ast, static_ast}
   end
 
-  defp rewrite_path(route, endpoint, router, statics) do
+  if @after_verify_supported do
+    defp warn_location(meta, %{line: line, file: file, function: function, module: module}) do
+      column = if column = meta[:column], do: column + 2
+      [line: line, function: function, module: module, file: file, column: column]
+    end
+  else
+    defp warn_location(_meta, env) do
+      Macro.Env.stacktrace(env)
+    end
+  end
+
+  defp rewrite_path(route, endpoint, router, config) do
     {:<<>>, meta, segments} = route
     {path_rewrite, query_rewrite} = verify_segment(segments, route)
+    path_rewrite = compile_prefixes(config.path_prefixes, meta) ++ path_rewrite
 
     rewrite_route =
-      quote generated: true do
-        query_str = unquote({:<<>>, meta, query_rewrite})
-        path_str = unquote({:<<>>, meta, path_rewrite})
+      if query_rewrite == [] do
+        {:<<>>, meta, path_rewrite}
+      else
+        quote generated: true do
+          query_str = unquote({:<<>>, meta, query_rewrite})
+          path_str = unquote({:<<>>, meta, path_rewrite})
 
-        if query_str == "" do
-          path_str
-        else
-          path_str <> "?" <> query_str
+          if query_str == "" do
+            path_str
+          else
+            path_str <> "?" <> query_str
+          end
         end
       end
 
     test_path = Enum.map_join(path_rewrite, &if(is_binary(&1), do: &1, else: "1"))
 
-    static? = static_path?(test_path, statics)
+    static? = static_path?(test_path, config.statics)
 
     path_ast =
       quote generated: true do
@@ -765,7 +970,22 @@ defmodule Phoenix.VerifiedRoutes do
         unquote(__MODULE__).static_path(unquote_splicing([endpoint, rewrite_route]))
       end
 
-    {static?, test_path, path_ast, static_ast}
+    {static?, meta, test_path, path_ast, static_ast}
+  end
+
+  defp compile_prefixes(path_prefixes, meta) do
+    Enum.flat_map(path_prefixes, fn
+      {module, fun, args} when is_atom(module) and is_atom(fun) and is_list(args) ->
+        [
+          "/",
+          {:"::", meta,
+           [{{:., meta, [module, fun]}, meta, Macro.escape(args)}, {:binary, meta, nil}]}
+        ]
+
+      other ->
+        raise ArgumentError,
+              ":path_prefixes option in VerifiedRoutes must be a {mod, fun, args} and return a string, got: #{inspect(other)}"
+    end)
   end
 
   defp attr!(%{function: nil}, _) do

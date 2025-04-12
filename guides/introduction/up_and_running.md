@@ -1,10 +1,34 @@
 # Up and Running
 
-Let's get a Phoenix application up and running as quickly as possible.
+There are two mechanisms to start a new Phoenix application: the express option, supported on some OSes, and via `mix phx.new`. Let's check it out.
 
-Before we begin, please take a minute to read the [Installation Guide](installation.html). By installing any necessary dependencies beforehand, we'll be able to get our application up and running smoothly.
+## Phoenix Express
 
-We can run `mix phx.new` from any directory in order to bootstrap our Phoenix application. Phoenix will accept either an absolute or relative path for the directory of our new project. Assuming that the name of our application is `hello`, let's run the following command:
+A single command will get you up and running in seconds:
+
+For macOS/Ubuntu:
+
+```bash
+$ curl https://new.phoenixframework.org/myapp | sh
+```
+
+For Windows PowerShell:
+
+```cmd
+> curl.exe -fsSO https://new.phoenixframework.org/myapp.bat; .\myapp.bat
+```
+
+The above will install Erlang, Elixir, and Phoenix, and generate a fresh Phoenix application. It will also automatically pick one of PostgreSQL or MySQL as the database, and fallback to SQLite if none of them are available. Once the command above completes, it will open up a Phoenix application, with the steps necessary to complete your installation.
+
+> Your Phoenix application name is taken from the path.
+
+If your operating system is not supported, or the command above fails, don't fret! You can still start your Phoenix application using `mix phx.new`.
+
+## Via `mix phx.new`
+
+In order to create a new Phoenix application, you will need to install Erlang, Elixir, and Phoenix. See the [Installation Guide](installation.html) for more information. If you share your application with someone, they will also need to follow the Installation Guide steps to set it all up.
+
+Once you are ready, you can run `mix phx.new` from any directory in order to bootstrap our Phoenix application. Phoenix will accept either an absolute or relative path for the directory of our new project. Assuming that the name of our application is `hello`, let's run the following command:
 
 ```console
 $ mix phx.new hello
@@ -18,7 +42,7 @@ $ mix phx.new hello
 >
 > - [Phoenix.LiveView](https://hexdocs.pm/phoenix_live_view/) for building realtime and interactive web applications. You can skip this with `--no-live`.
 >
-> Read the [Mix Tasks Guide](mix_tasks.html#phoenix-specific-mix-tasks) for the full list of things that can be excluded, among other options.
+> Run `mix help phx.new` to learn all options.
 
 ```console
 mix phx.new hello
@@ -61,9 +85,9 @@ You can also run your app inside IEx (Interactive Elixir) as:
 
 Once our dependencies are installed, the task will prompt us to change into our project directory and start our application.
 
-Phoenix assumes that our PostgreSQL database will have a `postgres` user account with the correct permissions and a password of "postgres". If that isn't the case, please see the [Mix Tasks Guide](mix_tasks.html#ecto-specific-mix-tasks) to learn more about the `mix ecto.create` task.
+Phoenix assumes that our PostgreSQL database will have a `postgres` user account with the correct permissions and a password of "postgres". Let's give it a try.
 
-Ok, let's give it a try. First, we'll `cd` into the `hello/` directory we've just created:
+First, we'll `cd` into the `hello/` directory we've just created:
 
 ```console
 $ cd hello
@@ -78,15 +102,13 @@ Generated hello app
 The database for Hello.Repo has been created
 ```
 
-In case the database could not be created, see the guides for the [`mix ecto.create`](mix_tasks.html#mix-ecto-create) for general troubleshooting.
-
-> Note: if this is the first time you are running this command, Phoenix may also ask to install Rebar. Go ahead with the installation as Rebar is used to build Erlang packages.
+In case the database could not be created, see [our Ecto section on Mix tasks](ecto.html#mix-tasks) or run `mix help ecto.create`.
 
 And finally, we'll start the Phoenix server:
 
 ```console
 $ mix phx.server
-[info] Running HelloWeb.Endpoint with cowboy 2.9.0 at 127.0.0.1:4000 (http)
+[info] Running HelloWeb.Endpoint with Bandit 1.5.7 at 127.0.0.1:4000 (http)
 [info] Access HelloWeb.Endpoint at http://localhost:4000
 [watch] build finished, watching for changes...
 ...

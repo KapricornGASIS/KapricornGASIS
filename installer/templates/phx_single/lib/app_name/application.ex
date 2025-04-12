@@ -11,12 +11,9 @@ defmodule <%= @app_module %>.Application do
       <%= @web_namespace %>.Telemetry,<%= if @ecto do %>
       <%= @app_module %>.Repo,<% end %><%= if @adapter_app == :ecto_sqlite3 do %>
       {Ecto.Migrator,
-        repos: Application.fetch_env!(<%= inspect(String.to_atom(@app_name)) %>, :ecto_repos),
-        skip: skip_migrations?()},<% end %>
+       repos: Application.fetch_env!(<%= inspect(String.to_atom(@app_name)) %>, :ecto_repos), skip: skip_migrations?()},<% end %>
       {DNSCluster, query: Application.get_env(<%= inspect(String.to_atom(@app_name)) %>, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: <%= @app_module %>.PubSub},<%= if @mailer do %>
-      # Start the Finch HTTP client for sending emails
-      {Finch, name: <%= @app_module %>.Finch},<% end %>
+      {Phoenix.PubSub, name: <%= @app_module %>.PubSub},
       # Start a worker by calling: <%= @app_module %>.Worker.start_link(arg)
       # {<%= @app_module %>.Worker, arg},
       # Start to serve requests, typically the last entry
@@ -39,6 +36,6 @@ defmodule <%= @app_module %>.Application do
 
   defp skip_migrations?() do
     # By default, sqlite migrations are run when using a release
-    System.get_env("RELEASE_NAME") != nil
+    System.get_env("RELEASE_NAME") == nil
   end<% end %>
 end

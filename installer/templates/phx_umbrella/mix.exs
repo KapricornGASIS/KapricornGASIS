@@ -7,7 +7,8 @@ defmodule <%= @root_app_module %>.MixProject do
       version: "0.1.0",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      aliases: aliases()
+      aliases: aliases(),
+      listeners: [Phoenix.CodeReloader]
     ]
   end
 
@@ -27,8 +28,7 @@ defmodule <%= @root_app_module %>.MixProject do
     [
       <%= if @dev or @phoenix_version.pre != [] do %><%= @phoenix_dep_umbrella_root %>,
       <% end %># Required to run "mix format" on ~H/.heex files from the umbrella root
-      # TODO bump on release to {:phoenix_live_view, ">= 0.0.0"},
-      {:phoenix_live_view, "~> 1.0.0-rc.0", override: true}
+      {:phoenix_live_view, ">= 0.0.0"}
     ]<% else %>
     []<% end %>
   end

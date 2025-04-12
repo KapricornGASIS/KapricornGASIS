@@ -52,8 +52,6 @@ defmodule Phx.New.Single do
        "test/:lib_web_name/controllers/page_controller_test.exs",
      "phx_web/components/layouts/root.html.heex":
        "lib/:lib_web_name/components/layouts/root.html.heex",
-     "phx_web/components/layouts/app.html.heex":
-       "lib/:lib_web_name/components/layouts/app.html.heex",
      "phx_web/components/layouts.ex": "lib/:lib_web_name/components/layouts.ex"},
     {:eex, :web, "phx_assets/logo.svg": "priv/static/images/logo.svg"}
   ])
@@ -70,7 +68,9 @@ defmodule Phx.New.Single do
   template(:css, [
     {:eex, :web,
      "phx_assets/app.css": "assets/css/app.css",
-     "phx_assets/tailwind.config.js": "assets/tailwind.config.js"}
+     "phx_assets/heroicons.js": "assets/vendor/heroicons.js",
+     "phx_assets/daisyui.js": "assets/vendor/daisyui.js",
+     "phx_assets/daisyui-theme.js": "assets/vendor/daisyui-theme.js"}
   ])
 
   template(:js, [
@@ -79,13 +79,18 @@ defmodule Phx.New.Single do
   ])
 
   template(:no_js, [
-    {:text, :web, "phx_static/app.js": "priv/static/assets/app.js"}
+    {:text, :web, "phx_static/app.js": "priv/static/assets/js/app.js"}
   ])
 
   template(:no_css, [
-    {:text, :web,
-     "phx_static/app.css": "priv/static/assets/app.css",
-     "phx_static/home.css": "priv/static/assets/home.css"}
+    {
+      :text,
+      :web,
+      # the default.css file can be re-created by using the recreate_default_css.exs file
+      # in the installer folder: `elixir installer/recreate_default_css.exs`
+      "phx_static/app.css": "priv/static/assets/css/app.css",
+      "phx_static/default.css": "priv/static/assets/default.css"
+    }
   ])
 
   template(:static, [
@@ -100,9 +105,9 @@ defmodule Phx.New.Single do
 
   def prepare_project(%Project{app: app, base_path: base_path} = project) when not is_nil(app) do
     if in_umbrella?(base_path) do
-      %Project{project | in_umbrella?: true, project_path: Path.dirname(Path.dirname(base_path))}
+      %{project | in_umbrella?: true, project_path: Path.dirname(Path.dirname(base_path))}
     else
-      %Project{project | in_umbrella?: false, project_path: base_path}
+      %{project | in_umbrella?: false, project_path: base_path}
     end
     |> put_app()
     |> put_root_app()
@@ -110,11 +115,11 @@ defmodule Phx.New.Single do
   end
 
   defp put_app(%Project{base_path: base_path} = project) do
-    %Project{project | app_path: base_path}
+    %{project | app_path: base_path}
   end
 
   defp put_root_app(%Project{app: app, opts: opts} = project) do
-    %Project{
+    %{
       project
       | root_app: app,
         root_mod: Module.concat([opts[:module] || Macro.camelize(app)])
@@ -122,7 +127,7 @@ defmodule Phx.New.Single do
   end
 
   defp put_web_app(%Project{app: app} = project) do
-    %Project{
+    %{
       project
       | web_app: app,
         lib_web_name: "#{app}_web",

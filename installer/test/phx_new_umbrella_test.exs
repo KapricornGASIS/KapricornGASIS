@@ -175,23 +175,18 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
         assert file =~ ~s|<meta name="csrf-token" content={get_csrf_token()} />|
       end)
 
-      assert_file(web_path(@app, "lib/#{@app}_web/components/layouts/app.html.heex"))
-
       # assets
       assert_file(web_path(@app, ".gitignore"), "/priv/static/assets/")
       assert_file(web_path(@app, ".gitignore"), "#{@app}_web-*.tar")
       assert_file(web_path(@app, ".gitignore"), ~r/\n$/)
-      assert_file(web_path(@app, "assets/css/app.css"))
-
-      assert_file(web_path(@app, "assets/tailwind.config.js"), fn file ->
-        assert file =~ "phx_umb_web.ex"
-        assert file =~ "phx_umb_web/**/*.*ex"
+      assert_file(web_path(@app, "assets/css/app.css"), fn file ->
+        assert file =~ "lib/phx_umb_web"
       end)
 
       assert_file(web_path(@app, "priv/static/favicon.ico"))
 
-      refute File.exists?(web_path(@app, "priv/static/assets/app.css"))
-      refute File.exists?(web_path(@app, "priv/static/assets/app.js"))
+      refute File.exists?(web_path(@app, "priv/static/assets/css/app.css"))
+      refute File.exists?(web_path(@app, "priv/static/assets/js/app.js"))
       assert File.exists?(web_path(@app, "assets/vendor"))
 
       # web deps
@@ -277,12 +272,8 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
 
       # Mailer
       assert_file(app_path(@app, "mix.exs"), fn file ->
-        assert file =~ "{:swoosh, \"~> 1.5\"}"
-        assert file =~ "{:finch, \"~> 0.13\"}"
-      end)
-
-      assert_file(app_path(@app, "lib/#{@app}/application.ex"), fn file ->
-        assert file =~ "{Finch, name: PhxUmb.Finch}"
+        assert file =~ "{:swoosh, \"~> 1.16\"}"
+        assert file =~ "{:req, \"~> 0.5\"}"
       end)
 
       assert_file(app_path(@app, "lib/#{@app}/mailer.ex"), fn file ->
@@ -304,7 +295,7 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
       end)
 
       assert_file(root_path(@app, "config/prod.exs"), fn file ->
-        assert file =~ "config :swoosh, :api_client, PhxUmb.Finch"
+        assert file =~ "config :swoosh, :api_client, Swoosh.ApiClient.Req"
       end)
 
       # Install dependencies?
@@ -319,7 +310,11 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
       assert_received {:mix_shell, :info, ["Start your Phoenix app" <> _]}
 
       # Gettext
-      assert_file(web_path(@app, "lib/#{@app}_web/gettext.ex"), ~r"defmodule PhxUmbWeb.Gettext")
+      assert_file(web_path(@app, "lib/#{@app}_web/gettext.ex"), [
+        ~r"defmodule PhxUmbWeb.Gettext",
+        ~r"use Gettext\.Backend, otp_app: :phx_umb_web"
+      ])
+
       assert File.exists?(web_path(@app, "priv/gettext/errors.pot"))
       assert File.exists?(web_path(@app, "priv/gettext/en/LC_MESSAGES/errors.po"))
     end)
@@ -346,8 +341,8 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
       assert_file(root_path(@app, "config/dev.exs"), ~r/watchers: \[\]/)
 
       # No assets & No HTML
-      refute_file(web_path(@app, "priv/static/assets/app.js"))
-      refute_file(web_path(@app, "priv/static/assets/app.css"))
+      refute_file(web_path(@app, "priv/static/assets/js/app.js"))
+      refute_file(web_path(@app, "priv/static/assets/css/app.css"))
 
       # No Ecto
       config = ~r/config :phx_umb, PhxUmb.Repo,/
@@ -413,12 +408,8 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
 
       # Without mailer
       assert_file(web_path(@app, "mix.exs"), fn file ->
-        refute file =~ "{:swoosh, \"~> 1.5\"}"
-        refute file =~ "{:finch, \"~> 0.13\"}"
-      end)
-
-      assert_file(app_path(@app, "lib/#{@app}/application.ex"), fn file ->
-        refute file =~ "{Finch, name: PhxUmb.Finch}"
+        refute file =~ "{:swoosh"
+        refute file =~ "{:req"
       end)
 
       refute File.exists?(app_path(@app, "lib/#{@app}/mailer.ex"))
@@ -443,10 +434,6 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
       Mix.Tasks.Phx.New.run([@app, "--umbrella", "--no-dashboard"])
 
       assert_file(web_path(@app, "mix.exs"), &refute(&1 =~ ~r":phoenix_live_dashboard"))
-
-      assert_file(web_path(@app, "lib/#{@app}_web/components/layouts/app.html.heex"), fn file ->
-        refute file =~ ~s|LiveDashboard|
-      end)
 
       assert_file(web_path(@app, "lib/#{@app}_web/endpoint.ex"), fn file ->
         assert file =~ ~s|defmodule PhxUmbWeb.Endpoint|
@@ -512,8 +499,8 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
 
       refute File.read!(web_path(@app, ".gitignore")) |> String.contains?("/priv/static/assets/")
       assert_file(web_path(@app, ".gitignore"), ~r/\n$/)
-      assert_file(web_path(@app, "priv/static/assets/app.js"))
-      assert_file(web_path(@app, "priv/static/assets/app.css"))
+      assert_file(web_path(@app, "priv/static/assets/js/app.js"))
+      assert_file(web_path(@app, "priv/static/assets/css/app.css"))
       assert_file(web_path(@app, "priv/static/favicon.ico"))
     end)
   end
@@ -526,27 +513,6 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
         root_path(@app, "config/config.exs"),
         ~r/generators: \[context_app: :phx_umb, binary_id: true\]/
       )
-    end)
-  end
-
-  test "new with uppercase" do
-    in_tmp("new with uppercase", fn ->
-      Mix.Tasks.Phx.New.run(["phxUmb", "--umbrella"])
-
-      assert_file("phxUmb_umbrella/README.md")
-
-      assert_file("phxUmb_umbrella/apps/phxUmb/mix.exs", fn file ->
-        assert file =~ "app: :phxUmb"
-      end)
-
-      assert_file("phxUmb_umbrella/apps/phxUmb_web/mix.exs", fn file ->
-        assert file =~ "app: :phxUmb_web"
-      end)
-
-      assert_file("phxUmb_umbrella/config/dev.exs", fn file ->
-        assert file =~ ~r/config :phxUmb, PhxUmb.Repo,/
-        assert file =~ "database: \"phxumb_dev\""
-      end)
     end)
   end
 
@@ -660,7 +626,7 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
         assert file =~ "skip: skip_migrations?()"
 
         assert file =~ "defp skip_migrations?() do"
-        assert file =~ ~s/System.get_env("RELEASE_NAME") != nil/
+        assert file =~ ~s/System.get_env("RELEASE_NAME") == nil/
       end)
 
       assert_file(root_path(app, "config/dev.exs"), [~r/database: .*_dev.db/])
@@ -727,6 +693,10 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
 
     assert_raise Mix.Error, ~r"Application name must start with a letter and ", fn ->
       Mix.Tasks.Phx.New.run(["valid1", "--app", "007invalid", "--umbrella"])
+    end
+
+    assert_raise Mix.Error, ~r"Application name must start with a letter and ", fn ->
+      Mix.Tasks.Phx.New.run(["valid1", "--app", "exInvalidAppAnme", "--umbrella"])
     end
 
     assert_raise Mix.Error, ~r"Module name must be a valid Elixir alias", fn ->
@@ -847,15 +817,14 @@ defmodule Mix.Tasks.Phx.New.UmbrellaTest do
         assert_file("another/lib/another/router.ex", "defmodule Another.Router")
         assert_file("another/lib/another.ex", "defmodule Another")
         assert_file("another/lib/another/components/layouts/root.html.heex")
-        assert_file("another/lib/another/components/layouts/app.html.heex")
 
         # assets
         assert_file("another/.gitignore", ~r/\n$/)
         assert_file("another/priv/static/favicon.ico")
         assert_file("another/assets/css/app.css")
 
-        refute File.exists?("another/priv/static/assets/app.css")
-        refute File.exists?("another/priv/static/assets/app.js")
+        refute File.exists?("another/priv/static/assets/css/app.css")
+        refute File.exists?("another/priv/static/assets/js/app.js")
         assert File.exists?("another/assets/vendor")
 
         # Ecto

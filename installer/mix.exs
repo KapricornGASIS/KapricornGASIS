@@ -6,7 +6,7 @@ end
 defmodule Phx.New.MixProject do
   use Mix.Project
 
-  @version "1.7.12"
+  @version "1.8.0-rc.0"
   @scm_url "https://github.com/phoenixframework/phoenix"
 
   # If the elixir requirement is updated, we need to update:
@@ -17,7 +17,7 @@ defmodule Phx.New.MixProject do
   #   4. test/test_helper.exs at the root
   #   5. installer/lib/mix/tasks/phx.new.ex
   #
-  @elixir_requirement "~> 1.14"
+  @elixir_requirement "~> 1.15"
 
   def project do
     [
@@ -37,7 +37,6 @@ defmodule Phx.New.MixProject do
         links: %{"GitHub" => @scm_url},
         files: ~w(lib templates mix.exs README.md)
       ],
-      preferred_cli_env: [docs: :docs],
       source_url: @scm_url,
       docs: docs(),
       homepage_url: "https://www.phoenixframework.org",
@@ -50,9 +49,13 @@ defmodule Phx.New.MixProject do
     ]
   end
 
+  def cli do
+    [preferred_envs: [docs: :docs]]
+  end
+
   def application do
     [
-      extra_applications: [:eex, :crypto]
+      extra_applications: [:eex, :crypto, :public_key]
     ]
   end
 

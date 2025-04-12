@@ -6,10 +6,14 @@ import Config
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :<%= @web_app_name %>, <%= @endpoint_module %>,
+config :<%= @web_app_name %>, <%= @endpoint_module %>,<%= if @inside_docker_env? do %>
+  # Bind to 0.0.0.0 to expose the server to the docker host machine.
+  # This makes make the service accessible from any network interface.
+  # Change to `ip: {127, 0, 0, 1}` to allow access only from the server machine.
+  http: [ip: {0, 0, 0, 0}, port: String.to_integer(System.get_env("PORT") || "4000")],<% else %>
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}, port: 4000],
+  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT") || "4000")],<% end %>
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
@@ -45,6 +49,7 @@ config :<%= @web_app_name %>, <%= @endpoint_module %>,
 # Watch static and templates for browser reloading.
 config :<%= @web_app_name %>, <%= @endpoint_module %>,
   live_reload: [
+    web_console_logger: true,
     patterns: [
       ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",<%= if @gettext do %>
       ~r"priv/gettext/.*(po)$",<% end %>
